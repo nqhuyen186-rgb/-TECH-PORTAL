@@ -1,0 +1,157 @@
+HTML
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tech Portal — Apps Script Bridge</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      max-width: 860px;
+      margin: 32px auto;
+      padding: 0 16px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    .sub { font-size: 13px; color: #475569; margin: 0 0 16px; word-break: break-all; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    textarea { min-height: 80px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #1e293b; }
+    button.secondary { background: #e2e8f0; color: #0f172a; }
+    button.secondary:hover { background: #cbd5e1; }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .status { font-size: 13px; color: #475569; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Tech Portal</h1>
+    <p class="sub">
+      Endpoint: <strong>https://script.google.com/macros/s/AKfycbzLrG6EfZwzndK5AZQCgFy0r7vVCtI0ovlYltyXuL6MGsz-CYLVLm23tyOeE0AoO9pg/exec</strong>
+    </p>
+
+    <div class="row">
+      <input id="queryAction" type="text" placeholder="Tham số GET (ví dụ: action=ping hoặc để trống)" />
+      <button id="btnGet" type="button">Gửi GET</button>
+    </div>
+
+    <label for="postPayload" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">
+      Dữ liệu gửi POST (JSON)
+    </label>
+    <textarea id="postPayload">{"action":"ping","source":"vercel"}</textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnPost" type="button">Gửi POST</button>
+      <button id="btnClear" class="secondary" type="button">Xóa kết quả</button>
+    </div>
+    <div id="status" class="status">Sẵn sàng.</div>
+  </div>
+
+  <div class="card">
+    <pre id="output">Chưa có phản hồi...</pre>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL =
+      "https://script.google.com/macros/s/AKfycbzLrG6EfZwzndK5AZQCgFy0r7vVCtI0ovlYltyXuL6MGsz-CYLVLm23tyOeE0AoO9pg/exec";
+
+    const outputEl = document.getElementById("output");
+    const statusEl = document.getElementById("status");
+
+    function formatResponseText(rawText) {
+      try {
+        const parsed = JSON.parse(rawText);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return rawText;
+      }
+    }
+
+    async function callGet() {
+      const rawQuery = document.getElementById("queryAction").value.trim();
+      const url = rawQuery
+        ? `${APPS_SCRIPT_URL}${rawQuery.startsWith("?") ? rawQuery : "?" + rawQuery}`
+        : APPS_SCRIPT_URL;
+
+      statusEl.textContent = "Đang gọi GET...";
+      outputEl.textContent = "Đang tải...";
+
+      try {
+        const res = await fetch(url, { method: "GET" });
+        const text = await res.text();
+        statusEl.textContent = `HTTP ${res.status} — Hoàn tất lúc ${new Date().toLocaleTimeString()}`;
+        outputEl.textContent = formatResponseText(text);
+      } catch (err) {
+        statusEl.textContent = "Lỗi kết nối";
+        outputEl.textContent = `Lỗi: ${err.message}`;
+      }
+    }
+
+    async function callPost() {
+      const payloadText = document.getElementById("postPayload").value;
+      statusEl.textContent = "Đang gửi POST...";
+      outputEl.textContent = "Đang xử lý...";
+
+      try {
+        // Dùng text/plain để tránh preflight CORS phức tạp khi gọi tới Google Apps Script
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: payloadText
+        });
+        const text = await res.text();
+        statusEl.textContent = `HTTP ${res.status} — Hoàn tất lúc ${new Date().toLocaleTimeString()}`;
+        outputEl.textContent = formatResponseText(text);
+      } catch (err) {
+        statusEl.textContent = "Lỗi kết nối";
+        outputEl.textContent = `Lỗi: ${err.message}`;
+      }
+    }
+
+    document.getElementById("btnGet").addEventListener("click", callGet);
+    document.getElementById("btnPost").addEventListener("click", callPost);
+    document.getElementById("btnClear").addEventListener("click", () => {
+      outputEl.textContent = "Đã xóa kết quả.";
+      statusEl.textContent = "Sẵn sàng.";
+    });
+  </script>
+</body>
+</html>
